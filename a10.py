@@ -122,6 +122,31 @@ def get_birth_date(name: str) -> str:
 
     return match.group("birth")
 
+def get_death_date(name: str) -> str:
+    """Gets death date of the given person"""
+    infobox_text = clean_text(get_first_infobox_text(get_page_html(name)))
+    pattern = r"(?:Died\D*)(?P<death>\d{4}-\d{2}-\d{2})"
+    error_text = "Page infobox has no death information (xxxx-xx-xx format)"
+    match = get_match(infobox_text, pattern, error_text)
+    return match.group("death")
+
+def get_population(place: str) -> str:
+    """Gets population of a city/country from its infobox"""
+    infobox_text = clean_text(get_first_infobox_text(get_page_html(place)))
+    pattern = r"Population(?:[^0-9]+)(?P<pop>[0-9,]+)"
+    error_text = "Page infobox has no population information"
+    match = get_match(infobox_text, pattern, error_text)
+    return match.group("pop")
+
+def get_capital_city(country: str) -> str:
+    """Gets the capital city of a country from its infobox"""
+    infobox_text = clean_text(get_first_infobox_text(get_page_html(country)))
+    pattern = r"Capital(?:[^A-Za-z]+)(?P<cap>[A-Za-z ,]+)"
+    error_text = "Page infobox has no capital city information"
+    match = get_match(infobox_text, pattern, error_text)
+    return match.group("cap").strip()
+
+
 
 # below are a set of actions. Each takes a list argument and returns a list of answers
 # according to the action and the argument. It is important that each function returns a
@@ -151,6 +176,17 @@ def polar_radius(matches: List[str]) -> List[str]:
     """
     return [get_polar_radius(matches[0])]
 
+def death_date(matches: List[str]) -> List[str]:
+    return [get_death_date(" ".join(matches))]
+
+def population(matches: List[str]) -> List[str]:
+    return [get_population(" ".join(matches))]
+
+def capital_city(matches: List[str]) -> List[str]:
+    return [get_capital_city(" ".join(matches))]
+
+
+
 
 # dummy argument is ignored and doesn't matter
 def bye_action(dummy: List[str]) -> None:
@@ -167,8 +203,15 @@ Action = Callable[[List[str]], List[Any]]
 pa_list: List[Tuple[Pattern, Action]] = [
     ("when was % born".split(), birth_date),
     ("what is the polar radius of %".split(), polar_radius),
+
+    # NEW FEATURES
+    ("when did % die".split(), death_date),
+    ("what is the population of %".split(), population),
+    ("what is the capital of %".split(), capital_city),
+
     (["bye"], bye_action),
 ]
+
 
 
 def search_pa_list(src: List[str]) -> List[str]:
