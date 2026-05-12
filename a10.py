@@ -133,22 +133,12 @@ def get_birth_date(name: str) -> str:
     return match.group("birth")
 
 def get_death_date(name: str) -> str:
-    html = get_page_html(name)
-    if html.startswith("ERROR"):
-        return html  # return the error message directly
+    infobox_text = clean_text(get_first_infobox_text(get_page_html(name)))
 
-    infobox_text = clean_text(get_first_infobox_text(html))
+    pattern = r"Died.*?(?P<death>[A-Z][a-z]+ \d{1,2}, \d{4})"
 
-    pattern = (
-        r"(?:Died\D*)"
-        r"(?P<death>"
-        r"\d{4}-\d{2}-\d{2}"
-        r"|[A-Za-z]+ \d{1,2}, \d{4}"
-        r"|\d{1,2} [A-Za-z]+ \d{4}"
-        r")"
-    )
+    match = re.search(pattern, infobox_text, re.IGNORECASE | re.DOTALL)
 
-    match = re.search(pattern, infobox_text, re.IGNORECASE)
     if not match:
         return "Death date not found"
 
@@ -156,58 +146,57 @@ def get_death_date(name: str) -> str:
 
 
 def get_population(place: str) -> str:
-    """Gets population of a city/country safely and robustly."""
+    infobox_text = clean_text(get_first_infobox_text(get_page_html(place)))
+
+    pattern = r"Population.*?([0-9]{1,3}(?:,[0-9]{3})+)"
+
+    match = re.search(pattern, infobox_text, re.IGNORECASE | re.DOTALL)
+
+    if not match:
+        return "Population not found"
+
+    return match.group(1)
+def get_capital_city(place: str) -> str:
+    """Gets capital city of a state/country."""
+
     html = get_page_html(place)
 
-    # Handle network or API errors
-    if html.startswith("ERROR"):
-        return html
+    soup = BeautifulSoup(html, "html.parser")
 
-    try:
-        infobox_text = clean_text(get_first_infobox_text(html))
-    except Exception:
-        return "Population not found"
+    infobox = soup.find("table", class_="infobox")
 
-    # Match first population number after any 'Population' label
-    pattern = r"Population[^0-9]+(?P<pop>[0-9][0-9,]*)"
-    match = re.search(pattern, infobox_text, re.IGNORECASE)
-
-    if not match:
-        return "Population not found"
-
-    return match.group("pop")
-
-
-def get_capital_city(country: str) -> str:
-    """Gets the capital city of a country safely and robustly."""
-    html = get_page_html(country)
-
-    # Handle network or API errors
-    if html.startswith("ERROR"):
-        return html
-
-    try:
-        infobox_text = clean_text(get_first_infobox_text(html))
-    except Exception:
+    if not infobox:
         return "Capital city not found"
 
-    # Capture text after "Capital" up to newline
-    pattern = r"Capital[^A-Za-z]+(?P<cap>[A-Za-z ,()]+)"
-    match = re.search(pattern, infobox_text, re.IGNORECASE)
+    rows = infobox.find_all("tr")
 
-    if not match:
-        return "Capital city not found"
+    for row in rows:
 
-    capital = match.group("cap").strip()
+        header = row.find("th")
 
-    # Remove parentheses like "(executive)"
-    capital = re.sub(r"\([^)]*\)", "", capital).strip()
+        if header:
 
-    # If multiple capitals listed, return the first
-    if "," in capital:
-        capital = capital.split(",")[0].strip()
+            header_text = header.get_text(" ", strip=True).lower()
 
-    return capital
+            # Match any header containing "capital"
+            if "capital" in header_text:
+
+                data = row.find("td")
+
+                if data:
+
+                    # Get clean text
+                    capital = data.get_text(" ", strip=True)
+
+                    # Remove citation numbers like [1]
+                    capital = re.sub(r"\[\d+\]", "", capital)
+
+                    # Remove extra whitespace
+                    capital = re.sub(r"\s+", " ", capital).strip()
+
+                    return capital
+
+    return "Capital city not found"
 
 
 # below are a set of actions. Each takes a list argument and returns a list of answers
@@ -313,7 +302,7 @@ def query_loop() -> None:
     while True:
         try:
             print()
-            query = input("Your query? ").replace("?", "").lower().split()
+            query = input("Your query? ").replace("?", "").split()
             answers = search_pa_list(query)
             for ans in answers:
                 print(ans)
