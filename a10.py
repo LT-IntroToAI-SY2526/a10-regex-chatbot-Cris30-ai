@@ -146,16 +146,31 @@ def get_death_date(name: str) -> str:
 
 
 def get_population(place: str) -> str:
-    infobox_text = clean_text(get_first_infobox_text(get_page_html(place)))
+    """Gets population of a city/state/country."""
 
-    pattern = r"Population.*?([0-9]{1,3}(?:,[0-9]{3})+)"
+    html = get_page_html(place)
 
-    match = re.search(pattern, infobox_text, re.IGNORECASE | re.DOTALL)
+    soup = BeautifulSoup(html, "html.parser")
 
-    if not match:
+    infobox = soup.find("table", class_=lambda x: x and "infobox" in x)
+
+    if not infobox:
         return "Population not found"
 
-    return match.group(1)
+    text = infobox.get_text(" ", strip=True)
+
+    # Find large comma-separated numbers
+    matches = re.findall(r"\b\d{1,3}(?:,\d{3})+\b", text)
+
+    if not matches:
+        return "Population not found"
+
+    # Return largest number found
+    largest = max(matches, key=lambda x: int(x.replace(",", "")))
+
+    return largest
+
+    
 def get_capital_city(place: str) -> str:
     """Gets capital city of a state/country."""
 
@@ -163,7 +178,7 @@ def get_capital_city(place: str) -> str:
 
     soup = BeautifulSoup(html, "html.parser")
 
-    infobox = soup.find("table", class_="infobox")
+    infobox = soup.find("table", class_=lambda x: x and "infobox" in x)
 
     if not infobox:
         return "Capital city not found"
@@ -174,31 +189,23 @@ def get_capital_city(place: str) -> str:
 
         header = row.find("th")
 
-        if header:
+        if header and "capital" in header.get_text().lower():
 
-            header_text = header.get_text(" ", strip=True).lower()
+            td = row.find("td")
 
-            # Match any header containing "capital"
-            if "capital" in header_text:
+            if td:
 
-                data = row.find("td")
+                text = td.get_text(" ", strip=True)
 
-                if data:
+                text = re.sub(r"\[\d+\]", "", text)
 
-                    # Get clean text
-                    capital = data.get_text(" ", strip=True)
+                # Take first reasonable word group
+                words = text.split()
 
-                    # Remove citation numbers like [1]
-                    capital = re.sub(r"\[\d+\]", "", capital)
-
-                    # Remove extra whitespace
-                    capital = re.sub(r"\s+", " ", capital).strip()
-
-                    return capital
+                if words:
+                    return words[0]
 
     return "Capital city not found"
-
-
 # below are a set of actions. Each takes a list argument and returns a list of answers
 # according to the action and the argument. It is important that each function returns a
 # list of the answer(s) and not just the answer itself.
@@ -302,7 +309,7 @@ def query_loop() -> None:
     while True:
         try:
             print()
-            query = input("Your query? ").replace("?", "").split()
+            query = input("Your query? ").replace("?", "").lower().split()
             answers = search_pa_list(query)
             for ans in answers:
                 print(ans)
