@@ -1,12 +1,21 @@
 import re, string, calendar, requests, time
-from wikipedia import WikipediaPage
-import wikipedia
 from bs4 import BeautifulSoup
 from match import match
 from typing import List, Callable, Tuple, Any, Match
 
 
 def get_page_html(title: str) -> str:
+    search_response = requests.get(
+        "https://en.wikipedia.org/w/api.php",
+        params={"action": "query", "list": "search", "srsearch": title, "format": "json"},
+        headers={"User-Agent": "intro-ai-class/1.0"},
+        timeout=10
+    )
+    results = search_response.json().get("query", {}).get("search", [])
+    if results:
+        title = results[0]["title"]  # use the top search result title
+        print(f"Searching Wikipedia for: {title}")
+    
     for attempt in range(5):
         response = requests.get(
             "https://en.wikipedia.org/w/api.php",
@@ -30,6 +39,7 @@ def get_page_html(title: str) -> str:
                 time.sleep(2)  # polite delay after every successful call
                 return data["parse"]["text"]["*"]
     raise ConnectionError(f"Could not retrieve Wikipedia page for '{title}' after 5 attempts")
+
 
 
 def get_first_infobox_text(html: str) -> str:
@@ -123,29 +133,81 @@ def get_birth_date(name: str) -> str:
     return match.group("birth")
 
 def get_death_date(name: str) -> str:
-    """Gets death date of the given person"""
-    infobox_text = clean_text(get_first_infobox_text(get_page_html(name)))
-    pattern = r"(?:Died\D*)(?P<death>\d{4}-\d{2}-\d{2})"
-    error_text = "Page infobox has no death information (xxxx-xx-xx format)"
-    match = get_match(infobox_text, pattern, error_text)
+    html = get_page_html(name)
+    if html.startswith("ERROR"):
+        return html  # return the error message directly
+
+    infobox_text = clean_text(get_first_infobox_text(html))
+
+    pattern = (
+        r"(?:Died\D*)"
+        r"(?P<death>"
+        r"\d{4}-\d{2}-\d{2}"
+        r"|[A-Za-z]+ \d{1,2}, \d{4}"
+        r"|\d{1,2} [A-Za-z]+ \d{4}"
+        r")"
+    )
+
+    match = re.search(pattern, infobox_text, re.IGNORECASE)
+    if not match:
+        return "Death date not found"
+
     return match.group("death")
 
+
 def get_population(place: str) -> str:
-    """Gets population of a city/country from its infobox"""
-    infobox_text = clean_text(get_first_infobox_text(get_page_html(place)))
-    pattern = r"Population(?:[^0-9]+)(?P<pop>[0-9,]+)"
-    error_text = "Page infobox has no population information"
-    match = get_match(infobox_text, pattern, error_text)
+    """Gets population of a city/country safely and robustly."""
+    html = get_page_html(place)
+
+    # Handle network or API errors
+    if html.startswith("ERROR"):
+        return html
+
+    try:
+        infobox_text = clean_text(get_first_infobox_text(html))
+    except Exception:
+        return "Population not found"
+
+    # Match first population number after any 'Population' label
+    pattern = r"Population[^0-9]+(?P<pop>[0-9][0-9,]*)"
+    match = re.search(pattern, infobox_text, re.IGNORECASE)
+
+    if not match:
+        return "Population not found"
+
     return match.group("pop")
 
-def get_capital_city(country: str) -> str:
-    """Gets the capital city of a country from its infobox"""
-    infobox_text = clean_text(get_first_infobox_text(get_page_html(country)))
-    pattern = r"Capital(?:[^A-Za-z]+)(?P<cap>[A-Za-z ,]+)"
-    error_text = "Page infobox has no capital city information"
-    match = get_match(infobox_text, pattern, error_text)
-    return match.group("cap").strip()
 
+def get_capital_city(country: str) -> str:
+    """Gets the capital city of a country safely and robustly."""
+    html = get_page_html(country)
+
+    # Handle network or API errors
+    if html.startswith("ERROR"):
+        return html
+
+    try:
+        infobox_text = clean_text(get_first_infobox_text(html))
+    except Exception:
+        return "Capital city not found"
+
+    # Capture text after "Capital" up to newline
+    pattern = r"Capital[^A-Za-z]+(?P<cap>[A-Za-z ,()]+)"
+    match = re.search(pattern, infobox_text, re.IGNORECASE)
+
+    if not match:
+        return "Capital city not found"
+
+    capital = match.group("cap").strip()
+
+    # Remove parentheses like "(executive)"
+    capital = re.sub(r"\([^)]*\)", "", capital).strip()
+
+    # If multiple capitals listed, return the first
+    if "," in capital:
+        capital = capital.split(",")[0].strip()
+
+    return capital
 
 
 # below are a set of actions. Each takes a list argument and returns a list of answers
@@ -177,13 +239,22 @@ def polar_radius(matches: List[str]) -> List[str]:
     return [get_polar_radius(matches[0])]
 
 def death_date(matches: List[str]) -> List[str]:
-    return [get_death_date(" ".join(matches))]
+    name = " ".join(matches).strip()
+    result = get_death_date(name)
+    return [result]
 
 def population(matches: List[str]) -> List[str]:
-    return [get_population(" ".join(matches))]
+    place = " ".join(matches).strip()
+    result = get_population(place)
+    return [result]
 
 def capital_city(matches: List[str]) -> List[str]:
-    return [get_capital_city(" ".join(matches))]
+    country = " ".join(matches).strip()
+    result = get_capital_city(country)
+    return [result]
+
+
+
 
 
 
