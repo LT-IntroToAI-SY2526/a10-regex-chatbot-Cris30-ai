@@ -269,11 +269,11 @@ def capital_city(matches: List[str]) -> List[str]:
     country = " ".join(matches).strip()
     result = get_capital_city(country)
     return [result]
+
 def area(matches: List[str]) -> List[str]:
     place = " ".join(matches).strip()
     result = get_area(place)
     return [result]
-
 
 
 
