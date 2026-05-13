@@ -206,6 +206,27 @@ def get_capital_city(place: str) -> str:
                     return words[0]
 
     return "Capital city not found"
+
+def get_area(place: str) -> str:
+    """Gets total area of a country/state/city from its infobox."""
+
+    html = get_page_html(place)
+    soup = BeautifulSoup(html, "html.parser")
+
+    infobox = soup.find("table", class_=lambda x: x and "infobox" in x)
+    if not infobox:
+        return "Area not found"
+
+    text = infobox.get_text(" ", strip=True)
+
+    # Look for patterns like "1,234 km2" or "1,234 sq mi"
+    match = re.search(r"\b([\d,]+)\s*(?:km2|sq mi)\b", text, re.IGNORECASE)
+
+    if not match:
+        return "Area not found"
+
+    return match.group(1)
+
 # below are a set of actions. Each takes a list argument and returns a list of answers
 # according to the action and the argument. It is important that each function returns a
 # list of the answer(s) and not just the answer itself.
@@ -248,6 +269,11 @@ def capital_city(matches: List[str]) -> List[str]:
     country = " ".join(matches).strip()
     result = get_capital_city(country)
     return [result]
+def area(matches: List[str]) -> List[str]:
+    place = " ".join(matches).strip()
+    result = get_area(place)
+    return [result]
+
 
 
 
@@ -275,6 +301,7 @@ pa_list: List[Tuple[Pattern, Action]] = [
     ("when did % die".split(), death_date),
     ("what is the population of %".split(), population),
     ("what is the capital of %".split(), capital_city),
+    ("what is the area of %".split(), area),
 
     (["bye"], bye_action),
 ]
