@@ -214,19 +214,23 @@ def get_area(place: str) -> str:
     soup = BeautifulSoup(html, "html.parser")
 
     infobox = soup.find("table", class_=lambda x: x and "infobox" in x)
+
     if not infobox:
         return "Area not found"
 
     text = infobox.get_text(" ", strip=True)
 
-    # Look for patterns like "1,234 km2" or "1,234 sq mi"
-    match = re.search(r"\b([\d,]+)\s*(?:km2|sq mi)\b", text, re.IGNORECASE)
+    # Look specifically for total area first
+    match = re.search(
+        r"Total\s+([\d,]+)\s*km",
+        text,
+        re.IGNORECASE
+    )
 
     if not match:
         return "Area not found"
 
     return match.group(1)
-
 # below are a set of actions. Each takes a list argument and returns a list of answers
 # according to the action and the argument. It is important that each function returns a
 # list of the answer(s) and not just the answer itself.
