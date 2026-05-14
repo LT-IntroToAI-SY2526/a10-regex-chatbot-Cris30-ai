@@ -171,42 +171,6 @@ def get_population(place: str) -> str:
     return largest
 
     
-def get_capital_city(place: str) -> str:
-    """Gets capital city of a state/country."""
-
-    html = get_page_html(place)
-
-    soup = BeautifulSoup(html, "html.parser")
-
-    infobox = soup.find("table", class_=lambda x: x and "infobox" in x)
-
-    if not infobox:
-        return "Capital city not found"
-
-    rows = infobox.find_all("tr")
-
-    for row in rows:
-
-        header = row.find("th")
-
-        if header and "capital" in header.get_text().lower():
-
-            td = row.find("td")
-
-            if td:
-
-                text = td.get_text(" ", strip=True)
-
-                text = re.sub(r"\[\d+\]", "", text)
-
-                # Take first reasonable word group
-                words = text.split()
-
-                if words:
-                    return words[0]
-
-    return "Capital city not found"
-
 def get_area(place: str) -> str:
     """Gets total area of a country/state/city from its infobox."""
 
@@ -220,11 +184,14 @@ def get_area(place: str) -> str:
 
     text = infobox.get_text(" ", strip=True)
 
-    # Look specifically for total area first
+    # Debug
+    print(text)
+
+    # Find area numbers near the word Area
     match = re.search(
-        r"Total\s+([\d,]+)\s*km",
+        r"Area.*?([\d,]+)\s*km",
         text,
-        re.IGNORECASE
+        re.IGNORECASE | re.DOTALL
     )
 
     if not match:
