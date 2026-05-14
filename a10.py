@@ -194,6 +194,40 @@ def get_area(place: str) -> str:
         return "Area not found"
 
     return match.group(1)
+def get_capital_city(place: str) -> str:
+    """Gets capital city of a state/country."""
+
+    html = get_page_html(place)
+
+    soup = BeautifulSoup(html, "html.parser")
+
+    infobox = soup.find("table", class_=lambda x: x and "infobox" in x)
+
+    if not infobox:
+        return "Capital city not found"
+
+    rows = infobox.find_all("tr")
+
+    for row in rows:
+
+        header = row.find("th")
+
+        if header and "capital" in header.get_text().lower():
+
+            td = row.find("td")
+
+            if td:
+
+                text = td.get_text(" ", strip=True)
+
+                text = re.sub(r"\[\d+\]", "", text)
+
+                words = text.split()
+
+                if words:
+                    return words[0]
+
+    return "Capital city not found"
 # below are a set of actions. Each takes a list argument and returns a list of answers
 # according to the action and the argument. It is important that each function returns a
 # list of the answer(s) and not just the answer itself.
