@@ -184,12 +184,8 @@ def get_area(place: str) -> str:
 
     text = infobox.get_text(" ", strip=True)
 
-    # Debug
-    print(text)
-
-    # Find area numbers near the word Area
     match = re.search(
-        r"Area.*?([\d,]+)\s*km",
+        r"Area.*?([\d,.]+)\s*km",
         text,
         re.IGNORECASE | re.DOTALL
     )
